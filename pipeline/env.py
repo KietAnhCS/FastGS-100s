@@ -125,15 +125,20 @@ def install_dependencies(force=False, flag_path=DEPS_FLAG):
     for module in SUBMODULES:
         if os.path.isdir(module):
             # --no-build-isolation: setup.py cần import torch có sẵn, môi trường cô lập không có
-            command = [sys.executable, "-m", "pip", "-q", "install", "--no-build-isolation", f"./{module}"]
+            # -v (không -q): pip -q che hết output của nvcc/gcc nên log chỉ còn dòng cuối vô nghĩa
+            command = [sys.executable, "-m", "pip", "install", "-v", "--no-build-isolation", f"./{module}"]
             print("$", " ".join(command))
             proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                   text=True, check=False, env=build_env)
             if proc.returncode != 0:
                 failed.append(module)
-                # pip -q che lỗi biên dịch thật; in đuôi log (chứa dòng "error:" của nvcc/gcc)
-                print(f"--- build {module} lỗi, 80 dòng cuối của log ---")
-                print("\n".join(proc.stdout.splitlines()[-80:]))
+                lines = proc.stdout.splitlines()
+                errors = [l for l in lines if any(k in l.lower() for k in
+                          ("error", "mismatch", "fatal", "no such file", "undefined"))]
+                print(f"--- build {module} lỗi: các dòng lỗi ---")
+                print("\n".join(errors[:40]))
+                print(f"--- 60 dòng cuối của log ---")
+                print("\n".join(lines[-60:]))
         else:
             print("bỏ qua submodule không tồn tại:", module)
     if failed:

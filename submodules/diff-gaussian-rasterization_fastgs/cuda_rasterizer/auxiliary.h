@@ -18,6 +18,9 @@
 #include "config.h"
 #include "stdio.h"
 #include <stdint.h>
+#include <cstddef>
+#include <iostream>
+#include <stdexcept>
 
 #define BLOCK_SIZE (BLOCK_X * BLOCK_Y)
 #define NUM_WARPS (BLOCK_SIZE/32)
