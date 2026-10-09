@@ -106,7 +106,7 @@ def verify_scene(cfg, scene):
     """Đối chiếu số ảnh thực tế với README.txt của ban tổ chức.
 
     gdown giới hạn 50 file mỗi thư mục ở một số phiên bản, nên một lần tải thiếu
-    có thể im lặng đi qua. README ghi rõ "Train images: 240" nên kiểm được.
+    có thể im lặng đi qua. README ghi rõ số ảnh ("Train images: 240" hoặc "Train: 233 ảnh") nên kiểm được.
     """
     path = scene_path(cfg, scene)
     root = os.path.dirname(path) if os.path.basename(path) == "train" else path
@@ -117,7 +117,7 @@ def verify_scene(cfg, scene):
     with open(readme, encoding="utf-8", errors="replace") as handle:
         text = handle.read()
     expected = {key: int(value) for key, value in
-                re.findall(r"(Train|Test) images:\s*(\d+)", text)}
+                re.findall(r"(Train|Test)(?: images)?:\s*(\d+)", text)}
     if not expected:
         return None
 
