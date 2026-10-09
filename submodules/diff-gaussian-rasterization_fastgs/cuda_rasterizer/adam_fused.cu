@@ -3,6 +3,8 @@
  */
 
 #include "adam_fused.h"
+#include <cmath>
+#include <cstdint>
 #include <cuda.h>
 #include "cuda_runtime.h"
 

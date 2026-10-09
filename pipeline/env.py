@@ -82,6 +82,32 @@ def _run(command):
     return subprocess.run(command, check=False).returncode
 
 
+def _prepare_build_env():
+    """Kiểm tra GPU/nvcc và dựng biến môi trường biên dịch CUDA (arch đúng GPU, giới hạn job)."""
+    import shutil
+
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("Không có GPU: Runtime > Change runtime type > chọn T4/L4/A100 rồi chạy lại")
+    env = dict(os.environ)
+    if not shutil.which("nvcc"):
+        for home in ("/usr/local/cuda", "/usr/local/cuda-" + (torch.version.cuda or "")):
+            if os.path.exists(os.path.join(home, "bin", "nvcc")):
+                env["CUDA_HOME"] = home
+                env["PATH"] = os.path.join(home, "bin") + os.pathsep + env.get("PATH", "")
+                break
+        else:
+            raise RuntimeError("Không tìm thấy nvcc (CUDA toolkit); cần runtime GPU có CUDA toolkit")
+    major, minor = torch.cuda.get_device_capability()
+    env["TORCH_CUDA_ARCH_LIST"] = f"{major}.{minor}"
+    # Colab ít RAM: nhiều job nvcc song song dễ bị OOM-kill giữa chừng
+    env.setdefault("MAX_JOBS", "2")
+    print(f"GPU {torch.cuda.get_device_name(0)} (sm_{major}{minor}), torch {torch.__version__}, "
+          f"CUDA torch {torch.version.cuda}")
+    return env
+
+
 def install_dependencies(force=False, flag_path=DEPS_FLAG):
     """Cài pip package + 3 submodule CUDA. Lần đầu ~3-5 phút, sau đó bỏ qua nhờ cờ.
 
@@ -93,13 +119,21 @@ def install_dependencies(force=False, flag_path=DEPS_FLAG):
     if os.path.exists(flag_path) and not force:
         print("dependencies đã cài (xoá", flag_path, "để cài lại)")
         return False
+    build_env = _prepare_build_env()
     _run([sys.executable, "-m", "pip", "-q", "install", *PIP_PACKAGES])
     failed = []
     for module in SUBMODULES:
         if os.path.isdir(module):
-            rc = _run([sys.executable, "-m", "pip", "-q", "install", f"./{module}"])
-            if rc != 0:
+            # --no-build-isolation: setup.py cần import torch có sẵn, môi trường cô lập không có
+            command = [sys.executable, "-m", "pip", "-q", "install", "--no-build-isolation", f"./{module}"]
+            print("$", " ".join(command))
+            proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, check=False, env=build_env)
+            if proc.returncode != 0:
                 failed.append(module)
+                # pip -q che lỗi biên dịch thật; in đuôi log (chứa dòng "error:" của nvcc/gcc)
+                print(f"--- build {module} lỗi, 80 dòng cuối của log ---")
+                print("\n".join(proc.stdout.splitlines()[-80:]))
         else:
             print("bỏ qua submodule không tồn tại:", module)
     if failed:

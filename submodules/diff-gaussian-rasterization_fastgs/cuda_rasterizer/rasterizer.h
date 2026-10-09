@@ -12,6 +12,9 @@
 #ifndef CUDA_RASTERIZER_H_INCLUDED
 #define CUDA_RASTERIZER_H_INCLUDED
 
+#include <cstddef>
+#include <cstdint>
+#include <tuple>
 #include <vector>
 #include <functional>
 
