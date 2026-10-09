@@ -26,6 +26,13 @@ def lpips(x: torch.Tensor,
     """
     if normalize:
         x, y = 2.0 * x - 1.0, 2.0 * y - 1.0
-    device = x.device
-    criterion = LPIPS(net_type, version).to(device)
+    # cache the network: rebuilding VGG16 (~528 MB) for every image is slow and
+    # thrashes Colab RAM
+    key = (net_type, version, str(x.device))
+    criterion = _CRITERIA.get(key)
+    if criterion is None:
+        criterion = _CRITERIA[key] = LPIPS(net_type, version).to(x.device).eval()
     return criterion(x, y)
+
+
+_CRITERIA = {}

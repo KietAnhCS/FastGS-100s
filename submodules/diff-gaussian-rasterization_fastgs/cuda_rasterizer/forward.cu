@@ -19,6 +19,13 @@
 #include <cooperative_groups/reduce.h>
 namespace cg = cooperative_groups;
 
+// cub::Max was removed in CUDA 13 (CCCL 3); portable replacement
+struct MaxOp
+{
+	template <typename T>
+	__device__ __forceinline__ T operator()(const T& a, const T& b) const { return a < b ? b : a; }
+};
+
 // Forward method for converting the input spherical harmonics
 // coefficients of each Gaussian to a simple RGB color.
 __device__ glm::vec3 computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* dc, const float* shs, bool* clamped)
@@ -434,7 +441,7 @@ renderCUDA(
 	// max reduce the last contributor
     typedef cub::BlockReduce<uint32_t, BLOCK_X, cub::BLOCK_REDUCE_WARP_REDUCTIONS, BLOCK_Y> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
-    last_contributor = BlockReduce(temp_storage).Reduce(last_contributor, cub::Max());
+    last_contributor = BlockReduce(temp_storage).Reduce(last_contributor, MaxOp());
 	if (block.thread_rank() == 0) {
 		max_contrib[tile_id] = last_contributor;
 	}
